@@ -5,6 +5,8 @@ The stats show the following:
 
 - How many stalls you have thieved since installing the plugin
 - The % chance of having received at least one pet.
+
+Different stalls have different odds of getting the pet, these are all taken into consideration when calculation the pet chance.
 <img width="252" height="53" alt="image" src="https://github.com/user-attachments/assets/0733dda7-964e-4d75-9b8e-4f65d6745b4f" />
 
 These stats can be turned off if you don't want to see some of them.
