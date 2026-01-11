@@ -1,23 +1,19 @@
 package com.thievingstallcounter;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonIOException;
-import com.google.gson.JsonParseException;
 import com.google.inject.Provides;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.events.*;
-import net.runelite.client.RuneLite;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 
 @Slf4j
@@ -43,15 +39,16 @@ public class ThievingStallCounterPlugin extends Plugin
 	private OverlayManager overlayManager;
 
 	@Inject
+	private ConfigManager configManager;
+
+	@Inject
 	private ThievingStallCounterOverlay overlay;
 
 	@Inject
+	private ClientThread clientThread;
+
+	@Inject
 	private Gson GSON;
-	public static File DATA_FOLDER;
-	static {
-		DATA_FOLDER = new File(RuneLite.RUNELITE_DIR, "thieving-stall-counter");
-		DATA_FOLDER.mkdirs();
-	}
 
 	@Override
 	protected void startUp() throws Exception
@@ -78,7 +75,7 @@ public class ThievingStallCounterPlugin extends Plugin
 		overlayManager.remove(overlay);
 
 		String username = client.getLocalPlayer().getName();
-		if (username != null) exportData(new File(DATA_FOLDER, username + ".json"));
+		if (username != null) exportData();
 	}
 
 	@Subscribe
@@ -140,63 +137,39 @@ public class ThievingStallCounterPlugin extends Plugin
 
 			String username = client.getLocalPlayer().getName();
 			if (username != null) {
-				exportData(new File(DATA_FOLDER, username + ".json"));
+				exportData();
 			}
 		}
 	}
 
-	private void exportData(File file) {
-		if (!config.saveData()) return;
-
+	private void exportData() {
 		ThievingStallCounterData data = new ThievingStallCounterData(
 				stallsThieved, totalPetChance
 		);
-		try (Writer writer = new FileWriter(file)) {
-			GSON.toJson(data, ThievingStallCounterData.class, writer);
-		} catch (IOException | JsonIOException e) {
-			log.error("Error while exporting Thieving Stall Counter data", e);
-		}
+		String json = GSON.toJson(data);
+		configManager.setRSProfileConfiguration("thievingstalldata", "all", json);
 	}
 
 	private void importData() {
-		if (!config.saveData()) return;
-
-		DATA_FOLDER.mkdirs();
-		String playerName = client.getLocalPlayer().getName();
-		File data = new File(DATA_FOLDER, playerName + ".json");
-
-		if (!data.exists()) {
-			initializeCounterDataFile(data);
-			return;
+		String json = configManager.getRSProfileConfiguration("thievingstalldata", "all", String.class);
+		ThievingStallCounterData data = GSON.fromJson(
+				json,
+				ThievingStallCounterData.class
+		);
+		if (data != null) {
+			stallsThieved = data.getStallsThieved();
+			totalPetChance = data.getPetChanceOfBeingDry();
+		} else {
+			stallsThieved = 0;
+			totalPetChance = 1;
 		}
-
-		try (Reader reader = new FileReader(data)) {
-			ThievingStallCounterData importedData = GSON.fromJson(reader, ThievingStallCounterData.class);
-			stallsThieved = importedData.getStallsThieved();
-			totalPetChance = importedData.getPetChanceOfBeingDry();
-			petDryChance = 1 - totalPetChance;
-		} catch (IOException e) {
-			log.warn("Error while reading Thieving Stall Counter data", e);
-		} catch (JsonParseException e) {
-			log.warn("Error while importing Thieving Stall Counter data", e);
-
-			// the file contains invalid json, let's get rid of it
-			try {
-				Path sourcePath = data.toPath();
-				Files.move(sourcePath, sourcePath.resolveSibling(String.format("%s-corrupt-%d.json", playerName, System.currentTimeMillis())));
-				initializeCounterDataFile(data);
-			} catch (IOException ex) {
-				log.warn("Could not neutralize corrupted Thieving Stall Counter data", ex);
-			}
-		}
+		petDryChance = 1 - totalPetChance;
 	}
 
-	private void initializeCounterDataFile(File data) {
-		try (Writer writer = new FileWriter(data)) {
-			GSON.toJson(new ThievingStallCounterData(), ThievingStallCounterData.class, writer);
-		} catch (IOException | JsonIOException e) {
-			log.warn("Error while initializing Thieving Stall Counter data file", e);
-		}
+	@Subscribe
+	public void onProfileChanged(ProfileChanged event)
+	{
+		clientThread.invokeLater(this::importData);
 	}
 
 	@Provides

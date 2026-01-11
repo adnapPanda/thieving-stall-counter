@@ -26,15 +26,4 @@ public interface ThievingStallCounterConfig extends Config
 	default boolean showPetChance() {
 		return true;
 	}
-
-	@ConfigItem(
-			position = 2,
-			keyName = "saveData",
-			name = "Save your data",
-			description = "Save your data cross-sessions to keep track of it."
-	)
-
-	default boolean saveData() {
-		return true;
-	}
 }
