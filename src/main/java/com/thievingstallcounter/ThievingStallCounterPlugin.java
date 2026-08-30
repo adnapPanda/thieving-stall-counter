@@ -104,7 +104,7 @@ public class ThievingStallCounterPlugin extends Plugin
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked menuOptionClicked)
 	{
-		if (menuOptionClicked.getMenuOption().toLowerCase().equals("steal-from") && menuOptionClicked.getMenuTarget().toLowerCase().contains("stall"))
+		if ((menuOptionClicked.getMenuOption().toLowerCase().equals("steal-from") || menuOptionClicked.getMenuOption().toLowerCase().equals("steal from")) && menuOptionClicked.getMenuTarget().toLowerCase().contains("stall"))
 		{
 			thievingStall = true;
 			thievedStallsRecently = true;
